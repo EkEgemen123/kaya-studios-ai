@@ -1,32 +1,19 @@
-# Gerekli kütüphaneleri içe aktarıyoruz
 from flask import Flask, render_template, request, jsonify, session
 import google.generativeai as genai
-import os # Ortam değişkenlerini okumak için bu kütüphane gerekli
+import os
 
 # Flask uygulamasını başlatıyoruz
 app = Flask(__name__)
-# Flask'in session özelliğini kullanabilmek için gizli bir anahtar belirliyoruz.
-# Bu anahtarı kimseyle paylaşmayın ve gerçek bir projede daha karmaşık bir şey kullanın.
+# Flask'in session özelliğini kullanabilmek için gizli bir anahtar belirlememiz gerekiyor.
 app.secret_key = 'kaya-studios-gizli-anahtari-12345'
 
-# --- GÜVENLİK GÜNCELLEMESİ ---
-# API anahtarını doğrudan koddan sildik.
-# Aşağıdaki kod, anahtarı sunucudaki (Render'daki) 'GEMINI_API_KEY' adlı ortam değişkeninden okuyacak.
-# Bu, anahtarınızın GitHub'da görünmesini engelleyerek projenizi güvende tutar.
-try:
-    GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
-    genai.configure(api_key=GEMINI_API_KEY)
-except KeyError:
-    print("HATA: GEMINI_API_KEY ortam değişkeni bulunamadı.")
-    print("Lütfen Render.com üzerindeki projenizin Environment ayarlarını kontrol edin.")
-    # Uygulamanın çökmemesi için geçici bir dummy key atayabiliriz, ancak API çalışmaz.
-    # genai.configure(api_key="DUMMY_KEY_HATA_ALINDI")
+# YENİ OLUŞTURDUĞUNUZ GÜVENLİ API ANAHTARINIZI BURAYA YAPIŞTIRIN
+genai.configure(api_key="AIzaSyAv39OVhS5c3sswB7DX6ud4WoHG6UHDdeE")
 
-
-# MODELLERİN TANIMLANMASI (DOĞRU MODELLERLE GÜNCELLENDİ)
+# MODELLERİN TANIMLANMASI
 MODEL_MAPPING = {
-    "3.5 fast": "gemini-1.5-flash-latest",
-    "4.0 pro": "gemini-1.5-pro-latest"
+    "3.5 fast": "gemini-2.5-flash",
+    "4.0 pro": "gemini-2.5-pro"
 }
 
 # BOTUN KİMLİĞİ VE KURALLARI (SİSTEM TALİMATI)
@@ -42,7 +29,7 @@ def chat():
         user_message = request.json['message']
         model_choice = request.json.get('model', '3.5 fast')
         
-        real_model_name = MODEL_MAPPING.get(model_choice, "gemini-1.5-flash-latest")
+        real_model_name = MODEL_MAPPING.get(model_choice, "gemini-2.5-flash")
 
         if 'chat_histories' not in session:
             session['chat_histories'] = {}
@@ -57,6 +44,8 @@ def chat():
         
         response = chat_session.send_message(user_message)
         ai_reply = response.text
+        
+    
         
         serializable_history = []
         for content in chat_session.history:
@@ -76,6 +65,5 @@ def chat():
         print(f"Hata: {e}")
         return jsonify({'reply': f"Üzgünüm, bir hata oluştu: {e}"})
 
-# Bu dosya doğrudan çalıştırıldığında web sunucusunu başlat
 if __name__ == "__main__":
     app.run(debug=True)
