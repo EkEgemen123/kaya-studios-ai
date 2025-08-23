@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaya Studios AI</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; }
+        .chat-container { max-width: 700px; margin: 30px auto; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
+        .chat-header { padding: 15px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; }
+        .chat-header h3 { margin: 0; color: #333; }
+        .model-selector select { border-radius: 6px; border: 1px solid #ccc; padding: 5px 8px; font-size: 14px; }
+        .chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; }
+        .chat-history div { margin-bottom: 15px; display: flex; flex-direction: column; }
+        .user-message { align-items: flex-end; }
+        .user-message p { background-color: #0084ff; color: white; padding: 12px 18px; border-radius: 18px 18px 4px 18px; display: inline-block; max-width: 80%; line-height: 1.4; }
+        .ai-message { align-items: flex-start; }
+        .ai-message p { background-color: #e4e6eb; color: #050505; padding: 12px 18px; border-radius: 18px 18px 18px 4px; display: inline-block; max-width: 80%; line-height: 1.4; }
+        .chat-input-area { border-top: 1px solid #ddd; padding: 15px; display: flex; }
+        #message-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 12px 18px; font-size: 16px; outline: none; }
+        #send-button { background-color: #0084ff; color: white; border: none; border-radius: 50%; width: 44px; height: 44px; margin-left: 10px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h3>Kaya Studios AI</h3>
+        <div class="model-selector">
+            <select id="model-selector">
+                <option value="3.5 fast">3.5 Fast</option>
+                <option value="4.0 pro">4.0 Pro(Şu Anda Geliştiriyoruz)</option>
+            </select>
+        </div>
+    </div>
+    <div class="chat-history" id="chat-history">
+        <div class="ai-message">
+            <p>Merhaba! Ben Kaya Studios tarafından geliştirilen bir yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?</p>
+        </div>
+    </div>
+    <div class="chat-input-area">
+        <input type="text" id="message-input" placeholder="Bir mesaj yazın...">
+        <button id="send-button" title="Gönder">&#10148;</button>
+    </div>
+</div>
+
+<script>
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const chatHistory = document.getElementById('chat-history');
+    const modelSelector = document.getElementById('model-selector');
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Enter'ın varsayılan form gönderme davranışını engelle
+            sendMessage();
+        }
+    });
+
+    async function sendMessage() {
+        const message = messageInput.value.trim();
+        const selectedModel = modelSelector.value;
+        if (message === '') return;
+
+        addMessageToHistory(message, 'user');
+        messageInput.value = '';
+
+        // Sunucuya mesajı VE seçilen modeli gönder
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                message: message,
+                model: selectedModel 
+            })
+        });
+
+        const data = await response.json();
+        addMessageToHistory(data.reply, 'ai');
+    }
+
+    function addMessageToHistory(message, sender) {
+        const messageDiv = document.createElement('div');
+        const messageP = document.createElement('p');
+        messageP.textContent = message;
+        
+        messageDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
+        
+        messageDiv.appendChild(messageP);
+        chatHistory.appendChild(messageDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+</script>
+
+</body>
+</html>
