@@ -8,7 +8,7 @@ app = Flask(__name__)
 app.secret_key = 'kaya-studios-gizli-anahtari-12345'
 
 # YENİ OLUŞTURDUĞUNUZ GÜVENLİ API ANAHTARINIZI BURAYA YAPIŞTIRIN
-genai.configure(api_key="AIzaSyAv39OVhS5c3sswB7DX6ud4WoHG6UHDdeE")
+genai.configure(api_key="AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
 
 # MODELLERİN TANIMLANMASI
 MODEL_MAPPING = {
