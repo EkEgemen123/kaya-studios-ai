@@ -12,8 +12,8 @@ genai.configure(api_key="AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
 
 # MODELLERİN TANIMLANMASI
 MODEL_MAPPING = {
-    "3.5 fast": "gemini-1.5-flash",
-    "4.0 pro": "gemini-2.0-flash"
+    "3.5 fast": "gemini-2.0-flash",
+    "4.0 pro": "gemini-2.5-flash"
 }
 
 # BOTUN KİMLİĞİ VE KURALLARI (SİSTEM TALİMATI)
