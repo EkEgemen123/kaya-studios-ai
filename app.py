@@ -1,34 +1,24 @@
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for, flash
 import google.generativeai as genai
-import os # Ortam değişkenini okumak için eklendi
+import os
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-
-# --- Flask ve Eklenti Başlatma ---
 app = Flask(__name__)
-app.secret_key = 'kaya-studios-cok-gizli-anahtari-54321' # Daha karmaşık bir key kullan
-
-# --- Veritabanı Konfigürasyonu (KRİTİK GÜNCELLEME) ---
-# Sunucuda (Render) DATABASE_URL değişkenini kullan, yerelde (local) SQLite'ı kullan.
+app.secret_key = 'kaya-studios-cok-gizli-anahtari-54321'
 database_url = os.environ.get("DATABASE_URL")
-
-# PostgreSQL URI düzenlemesi: Render'daki eski 'postgres://' önekini 'postgresql://' ile değiştir.
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-# Eğer DATABASE_URL tanımlıysa onu kullan, yoksa yerel SQLite'a dön.
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///users.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-# KRİTİK DÜZELTME: db.create_all() komutunu buraya taşıdık
 with app.app_context():
     db.create_all()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login' # Kullanıcı giriş yapmadan korumalı sayfaya giderse yönlendir
+login_manager.login_view = 'login'
 login_manager.login_message = "Lütfen devam etmek için giriş yapın."
 
 # --- Gemini API Konfigürasyonu ---
