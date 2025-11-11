@@ -6,125 +6,275 @@
     <title>Kaya Studios AI</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; }
-        .chat-container { max-width: 700px; margin: 30px auto; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
-        .chat-header { padding: 15px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; }
-        .chat-header h3 { margin: 0; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; height: 100vh; }
         
-        /* --- GİRİŞ SİSTEMİ STİLLERİ --- */
-        .header-right { display: flex; align-items: center; }
-        .header-right span { margin-right: 15px; color: #555; font-size: 14px; }
-        .header-right a { color: #0084ff; text-decoration: none; font-size: 14px; font-weight: 600; }
-        /* --- GİRİŞ STİL SONU --- */
+        /* Sidebar Styles */
+        .sidebar { 
+            width: 280px; 
+            background-color: #202123; 
+            color: #fff; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 10px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            flex-shrink: 0; 
+        }
+        .sidebar-header { padding: 10px 0; border-bottom: 1px solid #3c4043; margin-bottom: 10px; }
+        .new-chat-btn { 
+            width: 100%; 
+            padding: 10px; 
+            background-color: #3b3d40; 
+            border: 1px solid #4a4d51; 
+            color: #fff; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            text-align: left;
+            margin-bottom: 15px;
+            transition: background-color 0.2s;
+        }
+        .new-chat-btn:hover { background-color: #4a4d51; }
 
-        .model-selector select { border-radius: 6px; border: 1px solid #ccc; padding: 5px 8px; font-size: 14px; }
-        .chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; }
-        .chat-history div { margin-bottom: 15px; display: flex; flex-direction: column; }
-        .user-message { align-items: flex-end; }
-        .user-message p { background-color: #0084ff; color: white; padding: 12px 18px; border-radius: 18px 18px 4px 18px; display: inline-block; max-width: 80%; line-height: 1.4; }
-        .ai-message { align-items: flex-start; }
-        .ai-message p { background-color: #e4e6eb; color: #050505; padding: 12px 18px; border-radius: 18px 18px 18px 4px; display: inline-block; max-width: 80%; line-height: 1.4; }
+        .conversation-list { flex-grow: 1; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
+        .conversation-item { 
+            padding: 12px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            margin-bottom: 5px;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: block;
+            text-decoration: none;
+            color: #ccc;
+        }
+        .conversation-item:hover { background-color: #3b3d40; }
+        .conversation-item.active { background-color: #3b3d40; color: #fff; }
+
+        .user-info { padding: 10px 0; border-top: 1px solid #3c4043; margin-top: auto; font-size: 14px; }
+        .user-info a { color: #8ab4f8; text-decoration: none; margin-left: 10px; }
+
+        /* Main Chat Area Styles */
+        .chat-main { 
+            flex-grow: 1; 
+            display: flex; 
+            flex-direction: column; 
+            background-color: #fff; 
+            position: relative;
+        }
+        .chat-header { padding: 15px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .chat-header h3 { margin: 0; color: #333; }
+        .chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; background-color: #f7f7f8; }
+        .chat-history div { margin-bottom: 15px; display: flex; flex-direction: column; max-width: 80%; }
+        .user-message { align-self: flex-end; align-items: flex-end; }
+        .ai-message { align-self: flex-start; align-items: flex-start; }
+
+        .user-message p, .ai-message p { 
+            padding: 10px 15px; 
+            border-radius: 18px; 
+            margin: 0; 
+            max-width: 100%; 
+            word-wrap: break-word;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+            line-height: 1.4;
+        }
+        .user-message p { background-color: #0084ff; color: white; border-bottom-right-radius: 4px; }
+        .ai-message p { background-color: #e5e5ea; color: #333; border-bottom-left-radius: 4px; }
         
-        /* --- MARKDOWN (KOD) STİLLERİ --- */
+        /* MARKDOWN (KOD) STİLLERİ */
         .ai-message pre { background-color: #2f2f2f; color: #f1f1f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', Courier, monospace; font-size: 14px; max-width: 100%; box-sizing: border-box; }
         .ai-message code { font-family: 'Courier New', Courier, monospace; }
         .ai-message p > code { background-color: #ddd; color: #333; padding: 2px 5px; border-radius: 4px; font-size: 0.9em; }
-        /* --- MARKDOWN STİL SONU --- */
 
-        .chat-input-area { border-top: 1px solid #ddd; padding: 15px; display: flex; }
-        #message-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 12px 18px; font-size: 16px; outline: none; }
-        #send-button { background-color: #0084ff; color: white; border: none; border-radius: 50%; width: 44px; height: 44px; margin-left: 10px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+
+        .chat-input-area { 
+            padding: 20px; 
+            border-top: 1px solid #ddd; 
+            display: flex; 
+            align-items: center; 
+            flex-shrink: 0;
+            margin: 0 auto;
+            width: 100%;
+            max-width: 700px;
+        }
+        .chat-input-area textarea { 
+            flex-grow: 1; 
+            padding: 12px; 
+            border: 1px solid #ccc; 
+            border-radius: 20px; 
+            resize: none; 
+            font-size: 16px; 
+            margin-right: 10px; 
+            max-height: 100px;
+            outline: none;
+        }
+        .chat-input-area button { 
+            padding: 10px 20px; 
+            background-color: #0084ff; 
+            color: white; 
+            border: none; 
+            border-radius: 20px; 
+            cursor: pointer; 
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        .chat-input-area button:hover { background-color: #0066cc; }
     </style>
 </head>
 <body>
 
-<div class="chat-container">
+<div class="sidebar">
+    <div class="sidebar-header">
+        <form method="POST" action="{{ url_for('new_chat') }}">
+            <button type="submit" class="new-chat-btn">➕ Yeni Sohbet</button>
+        </form>
+    </div>
+    
+    <div class="conversation-list">
+        {% for convo in conversations %}
+        <a href="{{ url_for('home', chat_id=convo.id) }}" class="conversation-item {% if convo.id == current_chat_id %}active{% endif %}">
+            {{ convo.title }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="user-info">
+        <span>Giriş Yapan: {{ username }}</span>
+        <a href="{{ url_for('logout') }}">Çıkış Yap</a>
+    </div>
+</div>
+
+<div class="chat-main">
     <div class="chat-header">
-        <h3>Kaya Studios AI</h3>
-        <div class="header-right">
-            <span>Merhaba, {{ username }}</span> <div class="model-selector">
-                <select id="model-selector">
-                    <option value="4.0 pro">1.0</option>
-                </select>
-            </div>
-            <a href="{{ url_for('logout') }}" style="margin-left: 15px;">Çıkış Yap</a>
-        </div>
-        </div>
-    <div class="chat-history" id="chat-history">
-        <div class="ai-message">
-            <p>Merhaba! Ben Kaya Studios tarafından geliştirilen bir yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?</p>
+        <h3 id="current-chat-title">
+            {% for convo in conversations %}
+                {% if convo.id == current_chat_id %}
+                    {{ convo.title }}
+                {% endif %}
+            {% endfor %}
+            {% if not conversations %}Yeni Sohbet{% endif %}
+        </h3>
+        <div class="model-selector">
+            Model: 4.0 pro
         </div>
     </div>
+
+    <div class="chat-history" id="chat-history">
+        {% for message in initial_history %}
+            {% set sender_role = message.role %}
+            {% for part in message.parts %}
+                <div class="{{ sender_role }}-message">
+                    <p data-raw-text="{{ part.text }}" data-sender="{{ sender_role }}"></p>
+                </div>
+            {% endfor %}
+        {% endfor %}
+
+        {% if not initial_history %}
+            <div class="ai-message">
+                <p>Merhaba Egemen! Ben Kaya Studios tarafından geliştirilen bir yapay zeka asistanıyım. Sana nasıl yardımcı olabilirim?</p>
+            </div>
+        {% endif %}
+    </div>
+
     <div class="chat-input-area">
-        <input type="text" id="message-input" placeholder="Bir mesaj yazın...">
-        <button id="send-button" title="Gönder">&#10148;</button>
+        <textarea id="message-input" placeholder="Mesajınızı yazın..." rows="1"></textarea>
+        <button id="send-button">Gönder</button>
     </div>
 </div>
 
 <script>
+    // Flask'ten gelen değişkenler
+    const currentChatId = {{ current_chat_id }}; 
+    const chatHistory = document.getElementById('chat-history');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
-    const chatHistory = document.getElementById('chat-history');
-    const modelSelector = document.getElementById('model-selector');
+    const currentChatTitleElement = document.getElementById('current-chat-title');
+
+    // Sayfa yüklendiğinde geçmişi marked.js ile formatla
+    // Sunucudan gelen başlangıçtaki tüm mesajları işler
+    document.querySelectorAll('#chat-history p[data-raw-text]').forEach(p => {
+        p.innerHTML = marked.parse(p.getAttribute('data-raw-text'));
+    });
+
+    chatHistory.scrollTop = chatHistory.scrollHeight;
 
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault(); 
             sendMessage();
         }
     });
-
-    // 3. STREAMING (YAZMA EFEKTİ) ve MARKDOWN ENTEGRASYONU
+    
+    // Mesaj gönderme fonksiyonu (Stream ve ID desteği ile)
     async function sendMessage() {
         const message = messageInput.value.trim();
-        const selectedModel = modelSelector.value;
         if (message === '') return;
 
-        addMessageToHistory(message, 'user');
+        // Kullanıcı mesajını ekle
+        const userMessageP = addMessageToHistory(message, 'user');
+        userMessageP.innerHTML = marked.parse(message); // Kullanıcı mesajını da formatla
         messageInput.value = '';
-
-        const aiMessageP = addMessageToHistory("", 'ai');
-        aiMessageP.textContent = "Yazıyor...";
+        messageInput.style.height = 'auto'; // Textarea'yı küçült
+        
+        // AI mesaj kutusunu oluştur ve placeholder ekle
+        const aiMessageP = addMessageToHistory('...', 'ai');
+        let fullAiResponse = '';
+        let isReceiving = true;
+        
+        // Gönder butonu ve input'u devre dışı bırak
+        sendButton.disabled = true;
+        messageInput.disabled = true;
 
         try {
-            const response = await fetch('/chat', {
+            // Sunucuya mesajı ve SOHBET ID'sini gönder (KRİTİK!)
+            const response = await fetch('/chat_message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     message: message,
-                    model: selectedModel 
+                    chat_id: currentChatId 
                 })
             });
 
-            if (!response.body) {
-                throw new Error("Stream desteklenmiyor veya sunucu hatası.");
+            if (!response.ok || !response.body) {
+                // Hata oluşursa, sunucudan gelen JSON hatasını kontrol et
+                const errorText = await response.text();
+                throw new Error(errorText || `HTTP hatası! Durum kodu: ${response.status}`);
             }
-            
-            // 4. GİRİŞ SİSTEMİ (KONTROL)
-            // Session bitmişse veya giriş yapılmamışsa login'e atar
-            if (response.status === 401 || response.redirected) {
-                 window.location.href = "{{ url_for('login') }}"; 
-                 return;
-            }
-
-            aiMessageP.textContent = "";
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let fullAiResponse = '';
 
-            while (true) {
+            while (isReceiving) {
                 const { done, value } = await reader.read();
                 
                 if (done) {
-                    // Stream bitince Markdown'ı HTML'e çevirir (kod blokları için)
-                    aiMessageP.innerHTML = marked.parse(fullAiResponse);
+                    isReceiving = false;
                     break;
                 }
                 
                 const chunk = decoder.decode(value);
-                fullAiResponse += chunk;
+
+                // YENİ MANTIK: Başlık güncelleme sinyalini kontrol et
+                if (chunk.includes('$$$TITLE_UPDATE$$$')) {
+                    const parts = chunk.split('$$$TITLE_UPDATE$$$');
+                    const newTitle = parts[1].trim();
+                    currentChatTitleElement.textContent = newTitle;
+                    
+                    // Sidebar'daki aktif linkin metnini güncelle
+                    const activeConvoLink = document.querySelector(`.conversation-item.active`);
+                    if (activeConvoLink) {
+                        activeConvoLink.textContent = newTitle;
+                    }
+                    // Sinyalden önce gelen chunk kısmı varsa onu da yanıta ekle
+                    if (parts[0]) {
+                        fullAiResponse += parts[0];
+                    }
+                } else {
+                    fullAiResponse += chunk;
+                }
+
                 // Stream gelirken "yazma efekti" için düz metin basar
                 aiMessageP.textContent = fullAiResponse;
                 chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -132,7 +282,19 @@
 
         } catch (error) {
             console.error("Fetch hatası:", error);
-            aiMessageP.textContent = "Mesaj gönderilirken bir hata oluştu: " + error.message;
+            aiMessageP.textContent = "Mesaj gönderilirken bir hata oluştu. Lütfen konsolu kontrol edin.";
+        } finally {
+            // Stream bitince Markdown'ı HTML'e çevir
+            if (fullAiResponse) {
+                 aiMessageP.innerHTML = marked.parse(fullAiResponse);
+            } else if (aiMessageP.textContent === '...') {
+                aiMessageP.textContent = 'Yanıt alınamadı.';
+            }
+
+            // Butonları ve input'u tekrar etkinleştir
+            sendButton.disabled = false;
+            messageInput.disabled = false;
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
     }
 
@@ -140,7 +302,8 @@
         const messageDiv = document.createElement('div');
         const messageP = document.createElement('p');
         
-        messageP.textContent = message;
+        // Stream için başlangıçta textContent kullanılır
+        messageP.textContent = message; 
         
         messageDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
         
@@ -148,8 +311,15 @@
         chatHistory.appendChild(messageDiv);
         chatHistory.scrollTop = chatHistory.scrollHeight;
 
-        return messageP;
+        return messageP; // Mesaj elemanını geri döndür ki stream sırasında güncelleyebilelim
     }
+
+    // Textarea'nın otomatik büyüyüp küçülmesi
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    }, false);
+
 </script>
 
 </body>
