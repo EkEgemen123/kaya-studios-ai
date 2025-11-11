@@ -162,8 +162,9 @@
     <div class="chat-history" id="chat-history">
         {% for message in initial_history %}
             {% set sender_role = message.role %}
+            {% set css_class = 'user' if sender_role == 'user' else 'ai' %}
             {% for part in message.parts %}
-                <div class="{{ sender_role }}-message">
+                <div class="{{ css_class }}-message">
                     <p data-raw-text="{{ part.text }}" data-sender="{{ sender_role }}"></p>
                 </div>
             {% endfor %}
@@ -193,6 +194,7 @@
     // Sayfa yüklendiğinde geçmişi marked.js ile formatla
     // Sunucudan gelen başlangıçtaki tüm mesajları işler
     document.querySelectorAll('#chat-history p[data-raw-text]').forEach(p => {
+        // AI mesajları için gerekli olan kısım: marked.parse ile içeriği doldurur
         p.innerHTML = marked.parse(p.getAttribute('data-raw-text'));
     });
 
@@ -286,7 +288,8 @@
         } finally {
             // Stream bitince Markdown'ı HTML'e çevir
             if (fullAiResponse) {
-                 aiMessageP.innerHTML = marked.parse(fullAiResponse);
+                 // Çevirme işlemi sırasında HTML içeriği ayarlanır
+                 aiMessageP.innerHTML = marked.parse(fullAiResponse); 
             } else if (aiMessageP.textContent === '...') {
                 aiMessageP.textContent = 'Yanıt alınamadı.';
             }
@@ -298,14 +301,17 @@
         }
     }
 
+    // Mesajı geçmişe ekleyen temel yardımcı fonksiyon
     function addMessageToHistory(message, sender) {
         const messageDiv = document.createElement('div');
         const messageP = document.createElement('p');
         
-        // Stream için başlangıçta textContent kullanılır
+        // Bu fonksiyon, yeni mesajlar için kullanılır
         messageP.textContent = message; 
         
-        messageDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
+        // 'model' yerine 'ai' sınıfını kullanmak için
+        const cssClass = sender === 'user' ? 'user' : 'ai';
+        messageDiv.className = `${cssClass}-message`;
         
         messageDiv.appendChild(messageP);
         chatHistory.appendChild(messageDiv);
