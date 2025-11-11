@@ -93,7 +93,7 @@ def load_chat_history_from_db(conversation_id):
     history = []
     for record in records:
         history.append({
-            "role": record.role,
+            "role": record.role, # record.role 'user' veya 'model'
             "parts": [{"text": record.content}]
         })
     return history
