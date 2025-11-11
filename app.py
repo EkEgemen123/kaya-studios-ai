@@ -14,7 +14,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db' # SQLite veritaban�
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- Flask-Login Konfigürasyonu (YENİ) ---
+# KRİTİK DÜZELTME: db.create_all() komutunu buraya taşıdık
+with app.app_context():
+    db.create_all()
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login' # Kullanıcı giriş yapmadan korumalı sayfaya giderse yönlendir
@@ -51,8 +54,19 @@ def load_user(user_id):
 @app.route("/")
 @login_required # (YENİ) Artık ana sayfaya girmek için giriş gerekiyor
 def home():
-    # Giriş yapan kullanıcının adını index.html'e gönder
-    return render_template("index.html", username=current_user.username)
+    # Geçmişi yükleme mantığını buraya ekliyoruz
+    user_session_key = f"chat_histories_{current_user.id}"
+    # Eğer session'da hiçbir geçmiş yoksa, varsayılan olarak boş bir sözlük kullan.
+    user_histories = session.get(user_session_key, {})
+    
+    # Varsayılan model (gemini-2.5-flash) için geçmişi al.
+    current_model_name = MODEL_MAPPING.get("4.0 pro", "gemini-2.5-flash")
+    chat_history = user_histories.get(current_model_name, [])
+
+    # Giriş yapan kullanıcının adını ve geçmişini index.html'e gönder
+    return render_template("index.html", 
+                           username=current_user.username,
+                           initial_history=chat_history) # <-- YENİ: Geçmişi ekledik
 
 @app.route("/chat", methods=["POST"])
 @login_required # (YENİ) Sohbet için de giriş gerekiyor
@@ -64,14 +78,13 @@ def chat():
         real_model_name = MODEL_MAPPING.get(model_choice, "gemini-2.5-flash")
 
         # ÖNEMLİ: Şimdilik sohbet geçmişini hala Flask 'session'unda tutuyoruz.
-        # BİR SONRAKİ ADIMDA burayı veritabanına bağlayacağız.
         
         # Her kullanıcı için ayrı session geçmişi tut
         user_session_key = f"chat_histories_{current_user.id}"
 
         if user_session_key not in session:
             session[user_session_key] = {}
-        
+            
         user_histories = session[user_session_key]
 
         if real_model_name not in user_histories:
@@ -86,10 +99,12 @@ def chat():
         response = chat_session.send_message(user_message, stream=True)
         
         def generate_chunks():
+            full_response_text = ""
             try:
                 for chunk in response:
-                    if chunk.parts:
-                        yield chunk.parts[0].text
+                    if chunk.text:
+                        full_response_text += chunk.text
+                        yield chunk.text
             except Exception as e:
                 print(f"Stream sırasında hata: {e}")
                 yield f"Bir hata oluştu: {e}"
@@ -175,9 +190,4 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == "__main__":
-    with app.app_context():
-        # Bu satır, veritabanı dosyasını (users.db) ve içindeki 'user' tablosunu oluşturur.
-        db.create_all()
-        print("Veritabanı tabloları başarıyla oluşturuldu veya zaten mevcut.") #<- Kontrol için ekledik
-        
     app.run(debug=True)
