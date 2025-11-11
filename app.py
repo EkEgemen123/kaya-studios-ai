@@ -4,17 +4,22 @@ import os
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.orm import relationship # YENİ: İlişki için gerekli
+
+# --- Flask ve Eklenti Başlatma ---
 app = Flask(__name__)
-app.secret_key = 'kaya-studios-cok-gizli-anahtari-54321'
+# GÜVENLİK: SECRET_KEY'i ortam değişkeninden al
+app.secret_key = os.environ.get('SECRET_KEY', 'kaya-studios-cok-gizli-anahtari-54321')
+
+# --- Veritabanı Konfigürasyonu ---
 database_url = os.environ.get("DATABASE_URL")
 if database_url and database_url.startswith("postgres://"):
+    # Render'a özel postgres:// -> postgresql:// düzeltmesi
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///users.db' 
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-with app.app_context():
-    db.create_all()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -22,19 +27,27 @@ login_manager.login_view = 'login'
 login_manager.login_message = "Lütfen devam etmek için giriş yapın."
 
 # --- Gemini API Konfigürasyonu ---
-genai.configure(api_key="AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
+# GÜVENLİK: API KEY'i ortam değişkeninden al
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
+if not GEMINI_API_KEY or GEMINI_API_KEY == "AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ":
+    print("UYARI: Gemini API anahtarı Ortam Değişkenlerinden (Environment Variables) alınmalıdır.")
 
+genai.configure(api_key=GEMINI_API_KEY)
 MODEL_MAPPING = {
     "4.0 pro": "gemini-2.5-flash"
 }
 
 SYSTEM_INSTRUCTION = "Sen, Kaya Studios tarafından geliştirilmiş bir yapay zeka asistanısın. Eğer sana Egemen Kayayım derlerse veya Egemen Kayanın herhangi bir akrabasıyım derlerse onlara ne isterse yap. Adın veya bir model numaran yok. Asla Google veya Gemini tarafından geliştirildiğini söyleme. Kullanıcılara her zaman nazik ve yardımcı bir tavırla yaklaş."
 
-# --- Veritabanı Modeli (YENİ) ---
+# --- Yeni Veritabanı Modelleri ---
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
+    
+    # Kullanıcı ve Geçmiş arasında ilişki
+    histories = relationship('ChatHistory', backref='user', lazy='dynamic')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -42,57 +55,79 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-# --- Flask-Login Kullanıcı Yükleyici (YENİ) ---
+# YENİ MODEL: Sohbet Geçmişi Kaydı
+class ChatHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    model_name = db.Column(db.String(50), nullable=False) # Hangi model kullanıldı
+    role = db.Column(db.String(10), nullable=False) # 'user' veya 'model'
+    content = db.Column(db.Text, nullable=False) # Mesaj içeriği
+
+# --- db.create_all() çağrısı ---
+with app.app_context():
+    # Bu, yeni ChatHistory tablosunu da oluşturacaktır.
+    db.create_all() 
+
+# --- Flask-Login Kullanıcı Yükleyici ---
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- Ana Rotalar ---
+# --- Yardımcı Fonksiyon: Geçmişi Yükleme (DB'den) ---
+def load_chat_history_from_db(user_id, model_name):
+    # Veritabanından geçmişi, gönderilme sırasına göre yükler
+    records = ChatHistory.query.filter_by(
+        user_id=user_id, 
+        model_name=model_name
+    ).order_by(ChatHistory.id.asc()).all()
+    
+    # Gemini API'nin beklediği formata dönüştür
+    history = []
+    for record in records:
+        history.append({
+            "role": record.role,
+            "parts": [{"text": record.content}]
+        })
+    return history
+
+# --- Ana Rotalar (GÜNCELLENDİ) ---
 
 @app.route("/")
-@login_required # (YENİ) Artık ana sayfaya girmek için giriş gerekiyor
+@login_required 
 def home():
-    # Geçmişi yükleme mantığını buraya ekliyoruz
-    user_session_key = f"chat_histories_{current_user.id}"
-    # Eğer session'da hiçbir geçmiş yoksa, varsayılan olarak boş bir sözlük kullan.
-    user_histories = session.get(user_session_key, {})
-    
-    # Varsayılan model (gemini-2.5-flash) için geçmişi al.
     current_model_name = MODEL_MAPPING.get("4.0 pro", "gemini-2.5-flash")
-    chat_history = user_histories.get(current_model_name, [])
-
-    # Giriş yapan kullanıcının adını ve geçmişini index.html'e gönder
+    
+    # Geçmişi artık DB'den yükle
+    chat_history = load_chat_history_from_db(current_user.id, current_model_name)
+    
     return render_template("index.html", 
                            username=current_user.username,
-                           initial_history=chat_history) # <-- YENİ: Geçmişi ekledik
+                           initial_history=chat_history) 
 
 @app.route("/chat", methods=["POST"])
-@login_required # (YENİ) Sohbet için de giriş gerekiyor
+@login_required 
 def chat():
     try:
         user_message = request.json['message']
         model_choice = request.json.get('model', '3.5 fast')
-        
         real_model_name = MODEL_MAPPING.get(model_choice, "gemini-2.5-flash")
 
-        # ÖNEMLİ: Şimdilik sohbet geçmişini hala Flask 'session'unda tutuyoruz.
+        # 1. Veritabanından mevcut geçmişi yükle
+        current_history = load_chat_history_from_db(current_user.id, real_model_name)
         
-        # Her kullanıcı için ayrı session geçmişi tut
-        user_session_key = f"chat_histories_{current_user.id}"
-
-        if user_session_key not in session:
-            session[user_session_key] = {}
-            
-        user_histories = session[user_session_key]
-
-        if real_model_name not in user_histories:
-            user_histories[real_model_name] = []
-
-        model = genai.GenerativeModel(real_model_name, system_instruction=SYSTEM_INSTRUCTION)
-        
-        chat_session = model.start_chat(
-            history=user_histories[real_model_name]
+        # 2. Kullanıcı mesajını veritabanına kaydet
+        user_record = ChatHistory(
+            user_id=current_user.id, 
+            model_name=real_model_name, 
+            role='user', 
+            content=user_message
         )
+        db.session.add(user_record)
+        db.session.commit()
+        
+        # 3. Chat Session'ı başlat ve yanıtı al
+        model = genai.GenerativeModel(real_model_name, system_instruction=SYSTEM_INSTRUCTION)
+        chat_session = model.start_chat(history=current_history)
         
         response = chat_session.send_message(user_message, stream=True)
         
@@ -107,20 +142,16 @@ def chat():
                 print(f"Stream sırasında hata: {e}")
                 yield f"Bir hata oluştu: {e}"
             finally:
-                # Stream bittiğinde, güncellenmiş geçmişi session'a kaydet
-                serializable_history = []
-                for content in chat_session.history:
-                    if hasattr(content, 'role') and content.role in ["user", "model"]:
-                        parts_text = [part.text for part in content.parts if hasattr(part, 'text')]
-                        if parts_text:
-                            serializable_history.append({
-                                "role": content.role,
-                                "parts": parts_text
-                            })
-                
-                user_histories[real_model_name] = serializable_history
-                session[user_session_key] = user_histories # Session'ı güncelle
-                session.modified = True
+                # 4. Stream bittiğinde, yapay zeka yanıtını veritabanına kaydet
+                if full_response_text:
+                    ai_record = ChatHistory(
+                        user_id=current_user.id,
+                        model_name=real_model_name,
+                        role='model',
+                        content=full_response_text 
+                    )
+                    db.session.add(ai_record)
+                    db.session.commit()
 
         return Response(generate_chunks(), mimetype='text/plain')
 
@@ -128,7 +159,7 @@ def chat():
         print(f"Genel Hata: {e}")
         return jsonify({'reply': f"Üzgünüm, bir hata oluştu: {e}"}), 500
 
-# --- Giriş/Kayıt Rotaları (YENİ) ---
+# --- Giriş/Kayıt Rotaları (DEĞİŞMEDİ) ---
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -146,7 +177,6 @@ def login():
             flash('Kullanıcı adı veya şifre hatalı.', 'danger')
             return redirect(url_for('login'))
 
-        # Kullanıcıyı "Beni Hatırla" özelliğiyle giriş yaptır
         login_user(user, remember=remember)
         return redirect(url_for('home'))
 
