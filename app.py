@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for, flash
 import google.generativeai as genai
-import os
+import os # Ortam değişkenini okumak için eklendi
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -9,8 +9,16 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = 'kaya-studios-cok-gizli-anahtari-54321' # Daha karmaşık bir key kullan
 
-# --- Veritabanı Konfigürasyonu (YENİ) ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db' # SQLite veritabanı
+# --- Veritabanı Konfigürasyonu (KRİTİK GÜNCELLEME) ---
+# Sunucuda (Render) DATABASE_URL değişkenini kullan, yerelde (local) SQLite'ı kullan.
+database_url = os.environ.get("DATABASE_URL")
+
+# PostgreSQL URI düzenlemesi: Render'daki eski 'postgres://' önekini 'postgresql://' ile değiştir.
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+# Eğer DATABASE_URL tanımlıysa onu kullan, yoksa yerel SQLite'a dön.
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///users.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
