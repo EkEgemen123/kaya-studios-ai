@@ -10,6 +10,13 @@
         .chat-container { max-width: 700px; margin: 30px auto; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
         .chat-header { padding: 15px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; }
         .chat-header h3 { margin: 0; color: #333; }
+        
+        /* --- GİRİŞ SİSTEMİ STİLLERİ --- */
+        .header-right { display: flex; align-items: center; }
+        .header-right span { margin-right: 15px; color: #555; font-size: 14px; }
+        .header-right a { color: #0084ff; text-decoration: none; font-size: 14px; font-weight: 600; }
+        /* --- GİRİŞ STİL SONU --- */
+
         .model-selector select { border-radius: 6px; border: 1px solid #ccc; padding: 5px 8px; font-size: 14px; }
         .chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; }
         .chat-history div { margin-bottom: 15px; display: flex; flex-direction: column; }
@@ -18,30 +25,11 @@
         .ai-message { align-items: flex-start; }
         .ai-message p { background-color: #e4e6eb; color: #050505; padding: 12px 18px; border-radius: 18px 18px 18px 4px; display: inline-block; max-width: 80%; line-height: 1.4; }
         
-        /* --- KOD BLOKLARI İÇİN YENİ STİLLER --- */
-        .ai-message pre {
-            background-color: #2f2f2f;
-            color: #f1f1f1;
-            padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto; /* Kod satırı uzunsa yana kaydır */
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 14px;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-        .ai-message code {
-            font-family: 'Courier New', Courier, monospace;
-        }
-        /* Satır içi kodlar (paragraf içindeki `kod`) için */
-        .ai-message p > code {
-            background-color: #ddd;
-            color: #333;
-            padding: 2px 5px;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-        /* --- STİL SONU --- */
+        /* --- MARKDOWN (KOD) STİLLERİ --- */
+        .ai-message pre { background-color: #2f2f2f; color: #f1f1f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', Courier, monospace; font-size: 14px; max-width: 100%; box-sizing: border-box; }
+        .ai-message code { font-family: 'Courier New', Courier, monospace; }
+        .ai-message p > code { background-color: #ddd; color: #333; padding: 2px 5px; border-radius: 4px; font-size: 0.9em; }
+        /* --- MARKDOWN STİL SONU --- */
 
         .chat-input-area { border-top: 1px solid #ddd; padding: 15px; display: flex; }
         #message-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 12px 18px; font-size: 16px; outline: none; }
@@ -53,12 +41,15 @@
 <div class="chat-container">
     <div class="chat-header">
         <h3>Kaya Studios AI</h3>
-        <div class="model-selector">
-            <select id="model-selector">
-                <option value="4.0 pro">1.0</option>
-            </select>
+        <div class="header-right">
+            <span>Merhaba, {{ username }}</span> <div class="model-selector">
+                <select id="model-selector">
+                    <option value="4.0 pro">1.0</option>
+                </select>
+            </div>
+            <a href="{{ url_for('logout') }}" style="margin-left: 15px;">Çıkış Yap</a>
         </div>
-    </div>
+        </div>
     <div class="chat-history" id="chat-history">
         <div class="ai-message">
             <p>Merhaba! Ben Kaya Studios tarafından geliştirilen bir yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?</p>
@@ -84,8 +75,7 @@
         }
     });
 
-    // --- JS DEĞİŞİKLİKLERİ BURADA ---
-
+    // 3. STREAMING (YAZMA EFEKTİ) ve MARKDOWN ENTEGRASYONU
     async function sendMessage() {
         const message = messageInput.value.trim();
         const selectedModel = modelSelector.value;
@@ -94,9 +84,8 @@
         addMessageToHistory(message, 'user');
         messageInput.value = '';
 
-        // AI cevabı için yeni bir mesaj balonu oluştur ve <p> elementini yakala
         const aiMessageP = addMessageToHistory("", 'ai');
-        aiMessageP.textContent = "Yazıyor..."; // Başlangıçta
+        aiMessageP.textContent = "Yazıyor...";
 
         try {
             const response = await fetch('/chat', {
@@ -108,15 +97,19 @@
                 })
             });
 
-            // Arka uçtan stream (akış) gelip gelmediğini kontrol et
             if (!response.body) {
                 throw new Error("Stream desteklenmiyor veya sunucu hatası.");
             }
+            
+            // 4. GİRİŞ SİSTEMİ (KONTROL)
+            // Session bitmişse veya giriş yapılmamışsa login'e atar
+            if (response.status === 401 || response.redirected) {
+                 window.location.href = "{{ url_for('login') }}"; 
+                 return;
+            }
 
-            // "Yazıyor..." metnini temizle
             aiMessageP.textContent = "";
 
-            // Yanıtı stream (akış) olarak oku
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let fullAiResponse = '';
@@ -125,21 +118,15 @@
                 const { done, value } = await reader.read();
                 
                 if (done) {
-                    // Stream bitti!
-                    // Gelen tüm metni (fullAiResponse) Markdown'dan HTML'e çevir
-                    // ve innerHTML olarak ayarla. Bu, kod bloklarını vb. oluşturur.
+                    // Stream bitince Markdown'ı HTML'e çevirir (kod blokları için)
                     aiMessageP.innerHTML = marked.parse(fullAiResponse);
                     break;
                 }
                 
                 const chunk = decoder.decode(value);
                 fullAiResponse += chunk;
-                
-                // Her chunk geldiğinde, "yazma efekti" için textContent'i güncelle.
-                // Bu, HTML'i renderlamaz, sadece düz metni gösterir.
+                // Stream gelirken "yazma efekti" için düz metin basar
                 aiMessageP.textContent = fullAiResponse;
-                
-                // Scroll'u her zaman en altta tut
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
 
@@ -153,7 +140,6 @@
         const messageDiv = document.createElement('div');
         const messageP = document.createElement('p');
         
-        // Kullanıcı mesajları ve ilk AI mesajı için textContent kullan
         messageP.textContent = message;
         
         messageDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
@@ -162,7 +148,6 @@
         chatHistory.appendChild(messageDiv);
         chatHistory.scrollTop = chatHistory.scrollHeight;
 
-        // AI mesaj balonunu güncelleyebilmek için <p> elementini döndür
         return messageP;
     }
 </script>
