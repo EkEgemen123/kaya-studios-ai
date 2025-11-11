@@ -174,9 +174,10 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# --- Uygulamayı Çalıştırma ---
 if __name__ == "__main__":
-    # Veritabanını oluşturmak için
     with app.app_context():
+        # Bu satır, veritabanı dosyasını (users.db) ve içindeki 'user' tablosunu oluşturur.
         db.create_all()
+        print("Veritabanı tabloları başarıyla oluşturuldu veya zaten mevcut.") #<- Kontrol için ekledik
+        
     app.run(debug=True)
