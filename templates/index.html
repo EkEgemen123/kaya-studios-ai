@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kaya Studios AI</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; }
         .chat-container { max-width: 700px; margin: 30px auto; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
@@ -16,6 +17,32 @@
         .user-message p { background-color: #0084ff; color: white; padding: 12px 18px; border-radius: 18px 18px 4px 18px; display: inline-block; max-width: 80%; line-height: 1.4; }
         .ai-message { align-items: flex-start; }
         .ai-message p { background-color: #e4e6eb; color: #050505; padding: 12px 18px; border-radius: 18px 18px 18px 4px; display: inline-block; max-width: 80%; line-height: 1.4; }
+        
+        /* --- KOD BLOKLARI İÇİN YENİ STİLLER --- */
+        .ai-message pre {
+            background-color: #2f2f2f;
+            color: #f1f1f1;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto; /* Kod satırı uzunsa yana kaydır */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .ai-message code {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        /* Satır içi kodlar (paragraf içindeki `kod`) için */
+        .ai-message p > code {
+            background-color: #ddd;
+            color: #333;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        /* --- STİL SONU --- */
+
         .chat-input-area { border-top: 1px solid #ddd; padding: 15px; display: flex; }
         #message-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 12px 18px; font-size: 16px; outline: none; }
         #send-button { background-color: #0084ff; color: white; border: none; border-radius: 50%; width: 44px; height: 44px; margin-left: 10px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; }
@@ -52,10 +79,12 @@
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            e.preventDefault(); // Enter'ın varsayılan form gönderme davranışını engelle
+            e.preventDefault();
             sendMessage();
         }
     });
+
+    // --- JS DEĞİŞİKLİKLERİ BURADA ---
 
     async function sendMessage() {
         const message = messageInput.value.trim();
@@ -65,23 +94,66 @@
         addMessageToHistory(message, 'user');
         messageInput.value = '';
 
-        // Sunucuya mesajı VE seçilen modeli gönder
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                message: message,
-                model: selectedModel 
-            })
-        });
+        // AI cevabı için yeni bir mesaj balonu oluştur ve <p> elementini yakala
+        const aiMessageP = addMessageToHistory("", 'ai');
+        aiMessageP.textContent = "Yazıyor..."; // Başlangıçta
 
-        const data = await response.json();
-        addMessageToHistory(data.reply, 'ai');
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    message: message,
+                    model: selectedModel 
+                })
+            });
+
+            // Arka uçtan stream (akış) gelip gelmediğini kontrol et
+            if (!response.body) {
+                throw new Error("Stream desteklenmiyor veya sunucu hatası.");
+            }
+
+            // "Yazıyor..." metnini temizle
+            aiMessageP.textContent = "";
+
+            // Yanıtı stream (akış) olarak oku
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullAiResponse = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                    // Stream bitti!
+                    // Gelen tüm metni (fullAiResponse) Markdown'dan HTML'e çevir
+                    // ve innerHTML olarak ayarla. Bu, kod bloklarını vb. oluşturur.
+                    aiMessageP.innerHTML = marked.parse(fullAiResponse);
+                    break;
+                }
+                
+                const chunk = decoder.decode(value);
+                fullAiResponse += chunk;
+                
+                // Her chunk geldiğinde, "yazma efekti" için textContent'i güncelle.
+                // Bu, HTML'i renderlamaz, sadece düz metni gösterir.
+                aiMessageP.textContent = fullAiResponse;
+                
+                // Scroll'u her zaman en altta tut
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+        } catch (error) {
+            console.error("Fetch hatası:", error);
+            aiMessageP.textContent = "Mesaj gönderilirken bir hata oluştu: " + error.message;
+        }
     }
 
     function addMessageToHistory(message, sender) {
         const messageDiv = document.createElement('div');
         const messageP = document.createElement('p');
+        
+        // Kullanıcı mesajları ve ilk AI mesajı için textContent kullan
         messageP.textContent = message;
         
         messageDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
@@ -89,6 +161,9 @@
         messageDiv.appendChild(messageP);
         chatHistory.appendChild(messageDiv);
         chatHistory.scrollTop = chatHistory.scrollHeight;
+
+        // AI mesaj balonunu güncelleyebilmek için <p> elementini döndür
+        return messageP;
     }
 </script>
 
