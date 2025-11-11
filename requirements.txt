@@ -8,3 +8,5 @@ itsdangerous
 Jinja2
 MarkupSafe
 werkzeug
+Flask-SQLAlchemy
+Flask-Login
