@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response
 import google.generativeai as genai
 import os
 
@@ -8,6 +8,8 @@ app = Flask(__name__)
 app.secret_key = 'kaya-studios-gizli-anahtari-12345'
 
 # YENİ OLUŞTURDUĞUNUZ GÜVENLİ API ANAHTARINIZI BURAYA YAPIŞTIRIN
+# GÜVENLİK UYARISI: Bu anahtarı kodun içine yazmak risklidir.
+# os.environ.get('GEMINI_API_KEY') gibi ortam değişkenlerini kullanmak daha iyidir.
 genai.configure(api_key="AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
 
 # MODELLERİN TANIMLANMASI
@@ -41,28 +43,45 @@ def chat():
             history=session['chat_histories'][real_model_name]
         )
         
-        response = chat_session.send_message(user_message)
-        ai_reply = response.text
+        # --- DEĞİŞİKLİK BURADA BAŞLIYOR (STREAMING) ---
         
-    
+        response = chat_session.send_message(user_message, stream=True)
         
-        serializable_history = []
-        for content in chat_session.history:
-            if hasattr(content, 'role') and content.role in ["user", "model"]:
-                serializable_history.append({
-                    "role": content.role,
-                    "parts": [part.text for part in content.parts]
-                })
+        def generate_chunks():
+            try:
+                for chunk in response:
+                    # Bazen (örn. güvenlik filtreleri) chunk'ın text'i olmayabilir
+                    if chunk.parts:
+                        yield chunk.parts[0].text
+            except Exception as e:
+                print(f"Stream sırasında hata: {e}")
+                yield f"Bir hata oluştu: {e}"
+            finally:
+                # Stream bittiğinde, güncellenmiş geçmişi session'a kaydet
+                serializable_history = []
+                for content in chat_session.history:
+                    if hasattr(content, 'role') and content.role in ["user", "model"]:
+                        # Gemini bazen boş 'parts' gönderebilir, kontrol ekleyelim
+                        parts_text = [part.text for part in content.parts if hasattr(part, 'text')]
+                        if parts_text:
+                            serializable_history.append({
+                                "role": content.role,
+                                "parts": parts_text
+                            })
+                
+                session['chat_histories'][real_model_name] = serializable_history
+                session.modified = True
 
-        session['chat_histories'][real_model_name] = serializable_history
+        # Cevabı 'text/plain' olarak stream et
+        return Response(generate_chunks(), mimetype='text/plain')
         
-        session.modified = True
-
-        return jsonify({'reply': ai_reply})
+        # --- DEĞİŞİKLİK BURADA BİTİYOR ---
 
     except Exception as e:
-        print(f"Hata: {e}")
-        return jsonify({'reply': f"Üzgünüm, bir hata oluştu: {e}"})
+        print(f"Genel Hata: {e}")
+        # Hata durumunda da stream edebiliriz ama basitlik için JSON dönüyoruz
+        # (Bu durum frontend'de hata yönetimi gerektirir)
+        return jsonify({'reply': f"Üzgünüm, bir hata oluştu: {e}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
