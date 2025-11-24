@@ -6,316 +6,356 @@
     <title>Kaya Studios AI</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; height: 100vh; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; }
+        .chat-container { max-width: 700px; margin: 30px auto; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
+        .chat-header { padding: 15px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; }
+        .chat-header h3 { margin: 0; color: #333; }
         
-        /* Sidebar Styles */
-        .sidebar { width: 280px; background-color: #202123; color: #fff; display: flex; flex-direction: column; padding: 10px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); flex-shrink: 0; }
-        .sidebar-header { padding: 10px 0; border-bottom: 1px solid #3c4043; margin-bottom: 10px; }
-        .new-chat-btn { width: 100%; padding: 10px; background-color: #3b3d40; border: 1px solid #4a4d51; color: #fff; border-radius: 6px; cursor: pointer; text-align: left; margin-bottom: 15px; transition: background-color 0.2s; }
-        .new-chat-btn:hover { background-color: #4a4d51; }
+        /* --- GİRİŞ SİSTEMİ STİLLERİ --- */
+        .header-right { display: flex; align-items: center; }
+        .header-right span { margin-right: 15px; color: #555; font-size: 14px; }
+        .header-right a { color: #0084ff; text-decoration: none; font-weight: 600; padding: 5px 10px; border-radius: 6px; transition: background-color 0.2s; }
+        .header-right a:hover { background-color: #e6f0ff; }
+        /* ------------------------------- */
 
-        .conversation-list { flex-grow: 1; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
-        .convo-link-container { display: flex; align-items: center; margin-bottom: 5px; }
-        .conversation-item { padding: 12px; border-radius: 6px; cursor: pointer; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; text-decoration: none; color: #ccc; flex-grow: 1; margin-right: 5px;}
-        .conversation-item:hover { background-color: #3b3d40; }
-        .conversation-item.active { background-color: #3b3d40; color: #fff; }
+        .model-selector select { border-radius: 6px; border: 1px solid #ccc; padding: 5px 8px; font-size: 14px; }
+        .chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; }
+        .chat-history div { margin-bottom: 15px; display: flex; flex-direction: column; }
+        
+        .user-message { align-items: flex-end; }
+        .ai-message { align-items: flex-start; }
+        
+        .user-message p, .ai-message p { 
+            padding: 10px 15px; 
+            border-radius: 18px; 
+            max-width: 80%; 
+            line-height: 1.4;
+            word-wrap: break-word; /* Uzun kelimeleri kırma */
+        }
+        
+        .user-message p { 
+            background-color: #0084ff; 
+            color: #fff; 
+            border-bottom-right-radius: 2px;
+        }
+        
+        .ai-message p { 
+            background-color: #e9e9eb; 
+            color: #333; 
+            border-bottom-left-radius: 2px;
+        }
 
-        .delete-chat-btn {
+        /* --- YENİ: Resim ve Chat Input Stilleri --- */
+        .chat-input { display: flex; padding: 15px 20px; border-top: 1px solid #ddd; align-items: center; }
+        .chat-input input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 24px; margin-right: 10px; font-size: 16px; transition: border-color 0.2s; }
+        .chat-input input[type="text"]:focus { border-color: #0084ff; outline: none; }
+        .chat-input .btn { 
+            background-color: #0084ff; 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 24px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            font-weight: 600;
+            transition: background-color 0.2s;
+            flex-shrink: 0;
+        }
+        .chat-input .btn:hover { background-color: #006ddb; }
+        
+        .icon-button {
             background: none;
             border: none;
-            color: #ccc;
+            font-size: 24px;
             cursor: pointer;
-            padding: 8px;
-            border-radius: 50%;
-            font-size: 16px;
+            margin-right: 10px;
+            padding: 0;
             line-height: 1;
-            transition: color 0.2s, background-color 0.2s;
+        }
+
+        /* Resim Önizleme Stilleri */
+        #image-preview-container {
+            display: none; /* Başlangıçta gizli */
+            align-items: center;
+            padding: 10px 20px;
+            border-top: 1px solid #eee;
+            background-color: #f9f9f9;
+        }
+        #image-preview {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: 6px;
+            margin-right: 10px;
+            object-fit: cover;
+        }
+        #remove-image-button {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
             flex-shrink: 0;
-            opacity: 0; /* Normalde gizli */
         }
-        .convo-link-container:hover .delete-chat-btn {
-            opacity: 1; /* Hover'da görünür */
+
+        /* Resim Oluşturma Sonucu */
+        .ai-message img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-top: 10px;
         }
-        .delete-chat-btn:hover { color: #f00; background-color: #3b3d40; }
 
-
-        .user-info { padding: 10px 0; border-top: 1px solid #3c4043; margin-top: auto; font-size: 14px; }
-        .user-info a { color: #8ab4f8; text-decoration: none; margin-left: 10px; }
-
-        /* Main Chat Area Styles */
-        .chat-main { flex-grow: 1; display: flex; flex-direction: column; background-color: #fff; position: relative; }
-        .chat-header { padding: 15px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .chat-header h3 { margin: 0; color: #333; }
-        .chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; background-color: #f7f7f8; }
-        .chat-history div { margin-bottom: 15px; display: flex; flex-direction: column; max-width: 80%; }
-        .user-message { align-self: flex-end; align-items: flex-end; }
-        .ai-message { align-self: flex-start; align-items: flex-start; }
-
-        .user-message p, .ai-message p { padding: 10px 15px; border-radius: 18px; margin: 0; max-width: 100%; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0,0,0,0.05); line-height: 1.4; }
-        .user-message p { background-color: #0084ff; color: white; border-bottom-right-radius: 4px; }
-        .ai-message p { background-color: #e5e5ea; color: #333; border-bottom-left-radius: 4px; }
-        
-        /* MARKDOWN (KOD) STİLLERİ */
-        .ai-message pre { background-color: #2f2f2f; color: #f1f1f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', Courier, monospace; font-size: 14px; max-width: 100%; box-sizing: border-box; }
-        .ai-message code { font-family: 'Courier New', Courier, monospace; }
-        .ai-message p > code { background-color: #ddd; color: #333; padding: 2px 5px; border-radius: 4px; font-size: 0.9em; }
-
-        .chat-input-area { padding: 20px; border-top: 1px solid #ddd; display: flex; align-items: center; flex-shrink: 0; margin: 0 auto; width: 100%; max-width: 700px; }
-        .chat-input-area textarea { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; resize: none; font-size: 16px; margin-right: 10px; max-height: 100px; outline: none; }
-        .chat-input-area button { padding: 10px 20px; background-color: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 16px; transition: background-color 0.2s; }
-        .chat-input-area button:hover { background-color: #0066cc; }
     </style>
 </head>
 <body>
-
-<div class="sidebar">
-    <div class="sidebar-header">
-        <form method="POST" action="{{ url_for('new_chat') }}">
-            <button type="submit" class="new-chat-btn">➕ Yeni Sohbet</button>
-        </form>
-    </div>
-    
-    <div class="conversation-list">
-        {% for convo in conversations %}
-        <div class="convo-link-container" id="convo-container-{{ convo.id }}">
-            <a href="{{ url_for('home', chat_id=convo.id) }}" class="conversation-item {% if convo.id == current_chat_id %}active{% endif %}" id="convo-title-{{ convo.id }}">
-                {{ convo.title }}
-            </a>
-            <button class="delete-chat-btn" onclick="deleteConversation({{ convo.id }})">🗑️</button>
-        </div>
-        {% endfor %}
-    </div>
-
-    <div class="user-info">
-        <span>Giriş Yapan: {{ username }}</span>
-        <a href="{{ url_for('logout') }}">Çıkış Yap</a>
-    </div>
-</div>
-
-<div class="chat-main">
-    <div class="chat-header">
-        <h3 id="current-chat-title">
-            {% for convo in conversations %}
-                {% if convo.id == current_chat_id %}
-                    {{ convo.title }}
-                {% endif %}
-            {% endfor %}
-            {% if not conversations %}Yeni Sohbet{% endif %}
-        </h3>
-        <div class="model-selector">
-            Model: 4.0 pro
-        </div>
-    </div>
-
-    <div class="chat-history" id="chat-history">
-        {% for message in initial_history %}
-            {% set sender_role = message.role %}
-            {% set css_class = 'user' if sender_role == 'user' else 'ai' %}
-            {% for part in message.parts %}
-                <div class="{{ css_class }}-message">
-                    <p data-raw-text="{{ part.text }}" data-sender="{{ sender_role }}">{{ part.text }}</p>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h3>Kaya Studios AI</h3>
+            <div class="header-right">
+                <span>Hoş Geldiniz, {{ username }}</span>
+                <div class="model-selector">
+                    <select id="model-selector">
+                        <option value="4.0 pro">Sohbet: Gemini 4.0 Pro</option>
+                        <option value="image_generation">Resim Oluştur: Imagen</option> </select>
                 </div>
-            {% endfor %}
-        {% endfor %}
-
-        {% if not initial_history %}
-            <div class="ai-message">
-                <p>Merhaba Egemen! Ben Kaya Studios tarafından geliştirilen bir yapay zeka asistanıyım. Sana nasıl yardımcı olabilirim?</p>
+                <a href="{{ url_for('logout') }}">Çıkış Yap</a>
             </div>
-        {% endif %}
-    </div>
+        </div>
+        
+        <div class="chat-history" id="chat-history">
+            <div class="ai-message">
+                <p>Merhaba! Ben Kaya Studios yapay zeka asistanıyım. Nasıl yardımcı olabilirim? Artık bana resim yükleyebilir veya resim oluşturmamı isteyebilirsiniz!</p>
+            </div>
+        </div>
 
-    <div class="chat-input-area">
-        <textarea id="message-input" placeholder="Mesajınızı yazın..." rows="1"></textarea>
-        <button id="send-button">Gönder</button>
+        <div id="image-preview-container">
+            <img id="image-preview" src="#" alt="Yüklenen Resim Önizlemesi">
+            <span id="preview-filename"></span>
+            <button id="remove-image-button">X</button>
+        </div>
+        
+        <div class="chat-input">
+            <input type="file" id="image-upload" accept="image/*" style="display: none;">
+            <button id="upload-button" class="icon-button" onclick="document.getElementById('image-upload').click()">📎</button>
+            <input type="text" id="message-input" placeholder="Mesajınızı yazın veya resim komutunu girin...">
+            <button id="send-button" class="btn">Gönder</button>
+        </div>
     </div>
-</div>
 
 <script>
-    // Flask'ten gelen değişkenler
-    const currentChatId = {{ current_chat_id }}; 
     const chatHistory = document.getElementById('chat-history');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
-    const currentChatTitleElement = document.getElementById('current-chat-title');
-    const conversationList = document.querySelector('.conversation-list');
+    const modelSelector = document.getElementById('model-selector');
 
-
-    // Sayfa yüklendiğinde geçmişi marked.js ile formatla
-    document.querySelectorAll('#chat-history p[data-raw-text]').forEach(p => {
-        const rawText = p.getAttribute('data-raw-text');
-        const sender = p.getAttribute('data-sender');
-
-        if (sender === 'model' || sender === 'user') { 
-              // Hem AI hem de kullanıcı mesajları için Markdown kullan
-            p.innerHTML = marked.parse(rawText);
-        }
-    });
-
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    // YENİ ELEMANLAR
+    const uploadButton = document.getElementById('upload-button');
+    const imageUpload = document.getElementById('image-upload');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const previewFilename = document.getElementById('preview-filename');
+    const removeImageButton = document.getElementById('remove-image-button');
 
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault(); 
+        if (e.key === 'Enter') {
+            e.preventDefault();
             sendMessage();
         }
     });
+
+    // Resim önizleme mantığı
+    imageUpload.addEventListener('change', function() {
+        const file = imageUpload.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+                imagePreviewContainer.style.display = 'flex';
+                previewFilename.textContent = file.name;
+                removeImageButton.style.display = 'inline-block';
+                // Resim yüklenince mesaj kutusunu temizle
+                messageInput.value = ''; 
+            };
+            reader.readAsDataURL(file);
+        } else {
+            resetImagePreview();
+        }
+    });
+
+    removeImageButton.addEventListener('click', resetImagePreview);
+
+    function resetImagePreview() {
+        imageUpload.value = '';
+        imagePreview.src = '#';
+        imagePreviewContainer.style.display = 'none';
+        previewFilename.textContent = '';
+        removeImageButton.style.display = 'none';
+    }
+
+    // Model seçimine göre giriş alanını ayarla
+    modelSelector.addEventListener('change', function() {
+        const selectedModel = modelSelector.value;
+        if (selectedModel === 'image_generation') {
+            messageInput.placeholder = 'Oluşturulacak resmi tarif edin (Örn: Bir astronot kedi).';
+            uploadButton.style.display = 'none';
+            resetImagePreview();
+        } else {
+            messageInput.placeholder = 'Mesajınızı yazın veya resim komutunu girin...';
+            uploadButton.style.display = 'inline-block';
+        }
+    });
     
-    // Mesaj gönderme fonksiyonu (Stream ve ID desteği ile)
+    // --- TEMEL MESAJ GÖNDERME FONKSİYONU ---
     async function sendMessage() {
         const message = messageInput.value.trim();
-        if (message === '') return;
+        const selectedModel = modelSelector.value;
+        const imageFile = imageUpload.files[0];
 
-        // Kullanıcı mesajını ekle
-        const userMessageP = addMessageToHistory(message, 'user');
-        userMessageP.innerHTML = marked.parse(message); 
+        if (selectedModel === 'image_generation') {
+            if (message === '') return;
+            await generateImage(message);
+            return;
+        }
+
+        // --- SOHBET MODU (Metin veya Multimodal) ---
+        if (message === '' && !imageFile) return;
+
+        // Kullanıcı mesajını ve varsa resmi geçmişe ekle
+        addMessageToHistory(message, 'user', imageFile);
         messageInput.value = '';
-        messageInput.style.height = 'auto'; // Textarea'yı küçült
-        
-        // AI mesaj kutusunu oluştur ve placeholder ekle
-        const aiMessageP = addMessageToHistory('...', 'model'); 
-        let fullAiResponse = '';
-        let isReceiving = true;
-        
-        // Gönder butonu ve input'u devre dışı bırak
-        sendButton.disabled = true;
-        messageInput.disabled = true;
+        resetImagePreview(); // Önizlemeyi temizle
 
+        const formData = new FormData();
+        formData.append('message', message);
+        formData.append('model', selectedModel);
+        if (imageFile) {
+            formData.append('image', imageFile); // Resmi FormData'ya ekle
+        }
+
+        const aiMessageP = addMessageToHistory('Yapay zeka yanıtı bekleniyor...', 'ai');
+        
         try {
-            // Sunucuya mesajı ve SOHBET ID'sini gönder (KRİTİK!)
-            const response = await fetch('/chat_message', {
+            // FormData ile gönderiyoruz, sunucuda request.form ve request.files ile yakalanacak
+            const response = await fetch('/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    message: message,
-                    chat_id: currentChatId 
-                })
+                body: formData
             });
 
-            if (!response.ok || !response.body) {
+            if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(errorText || `HTTP hatası! Durum kodu: ${response.status}`);
+                aiMessageP.textContent = `Hata: Sunucu hatası oluştu. (${response.status} ${response.statusText}) - ${errorText.substring(0, 100)}`;
+                return;
             }
-
+            
+            // Stream okuma mantığı
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
+            let fullAiResponse = '';
 
-            while (isReceiving) {
+            while (true) {
                 const { done, value } = await reader.read();
                 
                 if (done) {
-                    isReceiving = false;
+                    aiMessageP.innerHTML = marked.parse(fullAiResponse); // Markdown'ı HTML'e çevir
                     break;
                 }
                 
                 const chunk = decoder.decode(value);
-
-                // YENİ MANTIK: Özel sinyalleri kontrol et
-                const titleUpdateSignal = '$$$TITLE_UPDATE$$$';
-                const errorSignal = '$$$STREAM_ERROR$$$';
-                
-                if (chunk.includes(titleUpdateSignal)) {
-                    // Başlık güncelleme sinyali
-                    const parts = chunk.split(titleUpdateSignal);
-                    const newTitle = parts[1].trim();
-                    
-                    // 1. Ana başlığı güncelle
-                    currentChatTitleElement.textContent = newTitle;
-                    
-                    // 2. Sidebar'daki aktif linkin metnini güncelle
-                    const activeConvoLink = document.querySelector(`.conversation-item.active`);
-                    if (activeConvoLink) {
-                        activeConvoLink.textContent = newTitle;
-                        // Sayfanın yenilenmesi gerekebilir, ancak şimdilik sadece metni güncelleyelim.
-                    }
-                    
-                    // Sinyalden önce gelen chunk kısmı varsa onu da yanıta ekle
-                    if (parts[0]) {
-                        fullAiResponse += parts[0];
-                    }
-
-                } else if (chunk.includes(errorSignal)) {
-                    // Hata sinyali
-                    const parts = chunk.split(errorSignal);
-                    const errorMessage = parts[1].trim();
-                    fullAiResponse += parts[0] + errorMessage; // Hata mesajını yanıta ekle
-                    isReceiving = false; // Stream'i durdur
-                    break;
-                } else {
-                    fullAiResponse += chunk;
-                }
-
-                // Stream gelirken "yazma efekti" için düz metin basar
-                aiMessageP.textContent = fullAiResponse;
+                fullAiResponse += chunk;
+                aiMessageP.textContent = fullAiResponse; // Stream gelirken düz metin bas
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
 
         } catch (error) {
             console.error("Fetch hatası:", error);
             aiMessageP.textContent = "Mesaj gönderilirken bir hata oluştu: " + error.message;
-        } finally {
-            // Stream bitince Markdown'ı HTML'e çevir
-            if (fullAiResponse) {
-                aiMessageP.innerHTML = marked.parse(fullAiResponse); 
-            } else if (aiMessageP.textContent === '...') {
-                aiMessageP.textContent = 'Yanıt alınamadı.';
-            }
+        }
+    }
+    
+    // --- YENİ: RESİM OLUŞTURMA FONKSİYONU ---
+    async function generateImage(prompt) {
+        // Kullanıcı komutunu geçmişe ekle
+        addMessageToHistory(`[Resim Komutu]: ${prompt}`, 'user');
+        messageInput.value = '';
 
-            // Butonları ve input'u tekrar etkinleştir
-            sendButton.disabled = false;
-            messageInput.disabled = false;
+        const aiMessageP = addMessageToHistory('Resim oluşturuluyor...', 'ai');
+        
+        try {
+            const response = await fetch('/generate_image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: prompt })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                aiMessageP.textContent = `Hata: ${data.error || 'Resim oluşturulamadı.'}`;
+                return;
+            }
+            
+            // AI yanıt metnini güncelle
+            aiMessageP.textContent = `İşte komutunuza göre oluşturulan resim: "${data.prompt}"`;
+            
+            // Resim elementini oluştur ve ekle
+            const imageContainer = aiMessageP.parentElement; // ai-message div
+            const imgElement = document.createElement('img');
+            imgElement.src = data.image_url;
+            imgElement.alt = data.prompt;
+            
+            imageContainer.appendChild(imgElement);
+            
             chatHistory.scrollTop = chatHistory.scrollHeight;
+
+        } catch (error) {
+            console.error("Resim oluşturma hatası:", error);
+            aiMessageP.textContent = "Resim oluşturma isteği sırasında bir hata oluştu: " + error.message;
         }
     }
 
-    // Mesajı geçmişe ekleyen temel yardımcı fonksiyon
-    function addMessageToHistory(message, sender) {
+    // --- Mesajı Geçmişe Ekleme Fonksiyonu (Resim Desteği Eklendi) ---
+    function addMessageToHistory(message, sender, imageFile = null) {
         const messageDiv = document.createElement('div');
         const messageP = document.createElement('p');
         
-        messageP.textContent = message; 
+        // Eğer kullanıcı mesajı ve resim varsa, önce resmi göster
+        if (sender === 'user' && imageFile) {
+            const imgElement = document.createElement('img');
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imgElement.src = e.target.result;
+            };
+            reader.readAsDataURL(imageFile);
+            
+            imgElement.style.maxWidth = '100%';
+            imgElement.style.maxHeight = '200px';
+            imgElement.style.borderRadius = '8px';
+            imgElement.style.marginBottom = message ? '8px' : '0';
+            messageDiv.appendChild(imgElement);
+        }
         
-        const cssClass = sender === 'user' ? 'user' : 'ai';
-        messageDiv.className = `${cssClass}-message`;
+        if (message) {
+            messageP.textContent = message;
+            messageDiv.appendChild(messageP);
+        }
         
-        messageDiv.appendChild(messageP);
+        messageDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
+        
+        
         chatHistory.appendChild(messageDiv);
         chatHistory.scrollTop = chatHistory.scrollHeight;
 
-        return messageP; 
+        return messageP; // AI yanıtı için P etiketini döndür
     }
     
-    // Sohbet silme fonksiyonu
-    function deleteConversation(chat_id) {
-        if (!confirm('Bu sohbeti kalıcı olarak silmek istediğinizden emin misiniz?')) {
-            return;
-        }
-        
-        // Silme isteğini sunucuya gönder
-        fetch(`/delete_chat/${chat_id}`, {
-            method: 'POST',
-        })
-        .then(response => {
-            if (response.redirected) {
-                // Flask redirect yaptığı için sayfayı yeniden yükle
-                window.location.href = response.url;
-            } else if (!response.ok) {
-                alert('Sohbet silinirken bir hata oluştu.');
-            }
-        })
-        .catch(error => {
-            console.error('Silme hatası:', error);
-            alert('Sohbet silinirken bir hata oluştu.');
-        });
-    }
-
-
-    // Textarea'nın otomatik büyüyüp küçülmesi
-    messageInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-    }, false);
+    // Sayfa yüklendiğinde model seçimine göre input'u ayarla
+    modelSelector.dispatchEvent(new Event('change'));
 
 </script>
 
