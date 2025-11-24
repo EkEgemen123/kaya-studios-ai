@@ -234,7 +234,9 @@ def chat_message():
                         yield f"\n\n$$$TITLE_UPDATE$$${new_title}"
 
                     db.session.commit()
-
+                else:
+                    db.session.commit() # Sadece user record için commit
+                
         return Response(generate_chunks(), mimetype='text/plain')
 
     except Exception as e:
