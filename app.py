@@ -16,6 +16,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'kaya-studios-cok-gizli-anahtari-5
 # --- Veritabanı Konfigürasyonu (POSTGRESQL ÖNCELİKLİ) ---
 database_url = os.environ.get("DATABASE_URL")
 if database_url and database_url.startswith("postgres://"):
+    # PostgreSQL bağlantı URL'sini düzeltir
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
 # OnRender'da DATABASE_URL tanımlıysa onu kullanır, yoksa yerel SQLite'a düşer.
@@ -30,7 +31,6 @@ login_manager.login_view = 'login'
 login_manager.login_message = "Lütfen devam etmek için giriş yapın."
 
 # --- Gemini API Konfigürasyonu ---
-# Ortam değişkeninden API anahtarını almayı zorla
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -77,7 +77,7 @@ class Message(db.Model):
     role = db.Column(db.String(10), nullable=False) # 'user' veya 'model'
     content = db.Column(db.Text, nullable=False) # Mesaj içeriği
 
-# Tabloları uygulama bağlamında oluştur
+# Tabloları uygulama bağlamında oluştur (VERİTABANI OLUŞTURMA İŞLEMİ)
 with app.app_context():
     db.create_all() 
 
@@ -246,7 +246,7 @@ def chat_message():
                     )
                     db.session.add(ai_record)
                     
-                    # 5. YENİ: İlk mesaj ise başlık oluştur ve kaydet
+                    # 5. KRİTİK: İlk mesaj ise başlık oluştur, zamanı güncelle ve kaydet
                     if is_first_message:
                         new_title = generate_chat_title(user_message)
                         conversation.title = new_title
@@ -256,7 +256,7 @@ def chat_message():
                         # Başlık güncellendiği için bunu istemciye bildir (Özel sinyal)
                         yield f"\n\n$$$TITLE_UPDATE$$${new_title}"
 
-                # İşlemleri veritabanına kaydet
+                # 6. İşlemleri veritabanına kalıcı olarak kaydet
                 db.session.commit()
                 
         return Response(generate_chunks(), mimetype='text/plain')
@@ -314,6 +314,4 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == "__main__":
-    # Eğer PostgreSQL kullanıyorsanız, yerelde test ederken de DATABASE_URL ayarlanmış olmalı.
-    # Aksi takdirde, SQLite dosyası (users.db) oluşacaktır.
     app.run(debug=True)
