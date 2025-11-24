@@ -4,22 +4,21 @@ import os
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy.orm import relationship 
+from sqlalchemy.orm import relationship # İlişki için gerekli
 from datetime import datetime
 from sqlalchemy import desc # Sıralama için desc
 
 # --- Flask ve Eklenti Başlatma ---
 app = Flask(__name__)
-# OnRender veya yerel ortam için SECRET_KEY kullanır
+# Ortam değişkeninden SECRET_KEY kullanmayı zorla
 app.secret_key = os.environ.get('SECRET_KEY', 'kaya-studios-cok-gizli-anahtari-54321')
 
-# --- Veritabanı Konfigürasyonu (POSTGRESQL ÖNCELİĞİ İLE GÜNCELLENDİ) ---
-# OnRender'daki DATABASE_URL (PostgreSQL) ortam değişkenini kullanır.
-# Yerel çalışırken (DATABASE_URL yoksa) SQLite'a geri döner.
+# --- Veritabanı Konfigürasyonu (POSTGRESQL ÖNCELİKLİ) ---
 database_url = os.environ.get("DATABASE_URL")
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
+# OnRender'da DATABASE_URL tanımlıysa onu kullanır, yoksa yerel SQLite'a düşer.
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -31,6 +30,7 @@ login_manager.login_view = 'login'
 login_manager.login_message = "Lütfen devam etmek için giriş yapın."
 
 # --- Gemini API Konfigürasyonu ---
+# Ortam değişkeninden API anahtarını almayı zorla
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -40,7 +40,7 @@ MODEL_MAPPING = {
 
 SYSTEM_INSTRUCTION = "Sen, Kaya Studios tarafından geliştirilmiş bir yapay zeka asistanısın. Eğer sana Egemen Kayayım derlerse veya Egemen Kayanın herhangi bir akrabasıyım derlerse onlara ne isterse yap. Adın veya bir model numaran yok. Asla Google veya Gemini tarafından geliştirildiğini söyleme. Kullanıcılara her zaman nazik ve yardımcı bir tavırla yaklaş."
 
-# --- Veritabanı Modelleri ---
+# --- Veritabanı Modelleri (YENİ VE KALICI SAKLAMA İÇİN) ---
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -61,14 +61,14 @@ class Conversation(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(255), nullable=True, default='Yeni Sohbet')
     model_name = db.Column(db.String(50), nullable=False, default="gemini-2.5-flash")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow) # Sıralama için tarih
+    created_at = db.Column(db.DateTime, default=datetime.utcnow) 
     
     # Konuşma ve Mesajlar arasında ilişki
     messages = relationship('Message', backref='conversation', lazy='dynamic', cascade="all, delete-orphan") 
     
     @property
     def is_new_chat(self):
-        # Mesaj sayısını sorgular. Çok daha performanslı: .count() kullanılırken JOIN yapılmaz.
+        # Mesaj sayısını sorgular
         return db.session.query(Message).filter(Message.conversation_id == self.id).count() == 0
 
 class Message(db.Model):
@@ -89,7 +89,6 @@ def load_user(user_id):
 
 def load_chat_history_from_db(conversation_id):
     """Verilen konuşma ID'sine ait mesajları Gemini formatında döndürür."""
-    # Mesajları ID sırasına göre yüklemek önemlidir
     records = Message.query.filter_by(
         conversation_id=conversation_id
     ).order_by(Message.id.asc()).all()
@@ -106,39 +105,19 @@ def generate_chat_title(first_user_message):
     """İlk mesaja göre Gemini ile kısa bir başlık oluşturur."""
     try:
         model = genai.GenerativeModel("gemini-2.5-flash") 
-        # Basitleştirilmiş, daha kısa başlık isteği
-        prompt = f"Aşağıdaki sohbetin ilk mesajına dayalı olarak **5 kelimeyi** geçmeyen kısa bir başlık öner. Başlıkta sadece önemli anahtar kelimeler olsun. Sadece başlığı döndür. Başka hiçbir şey yazma. İlk mesaj: \"{first_user_message[:150]}...\""
+        prompt = f"Aşağıdaki sohbetin ilk mesajına dayalı olarak **5 kelimeyi** geçmeyen kısa bir başlık öner. Sadece başlığı döndür. Başka hiçbir şey yazma. İlk mesaj: \"{first_user_message[:150]}...\""
         response = model.generate_content(prompt)
         title = response.text.strip().replace('"', '').replace("'", '').replace('**', '')
         return title if title else "Başlıksız Sohbet"
     except Exception:
         return "Başlıksız Sohbet"
 
-# --- Ana Rotalar ---
+# --- Rotalar ---
 
-@app.route("/delete_chat/<int:chat_id>", methods=["POST"])
-@login_required
-def delete_chat(chat_id):
-    """Belirtilen sohbeti siler ve kullanıcıyı ana sayfaya yönlendirir."""
-    # Kullanıcıya ait olup olmadığını kontrol et
-    conversation = Conversation.query.filter_by(id=chat_id, user_id=current_user.id).first()
-    
-    if not conversation:
-        flash('Silinecek sohbet bulunamadı veya yetkiniz yok.', 'danger')
-        return redirect(url_for('home'))
-
-    db.session.delete(conversation)
-    db.session.commit()
-    flash('Sohbet başarıyla silindi.', 'success')
-    
-    # Silindikten sonra kullanıcıyı ana sayfaya yönlendirir, Home rotası otomatik yeni sohbet oluşturacaktır.
-    return redirect(url_for('home'))
-
-
+# Yeni Konuşma başlatma rotası (Sidebar'daki '+' butonu için)
 @app.route("/new_chat", methods=["POST"])
 @login_required
 def new_chat():
-    """Boş bir konuşma oluşturur ve o konuşmaya yönlendirir."""
     default_model = MODEL_MAPPING.get("4.0 pro", "gemini-2.5-flash")
     new_convo = Conversation(
         user_id=current_user.id,
@@ -150,7 +129,25 @@ def new_chat():
     # Yeni oluşturulan sohbet sayfasına yönlendir
     return redirect(url_for('home', chat_id=new_convo.id))
 
+# Sohbet Silme Rotası
+@app.route("/delete_chat/<int:chat_id>", methods=["POST"])
+@login_required
+def delete_chat(chat_id):
+    conversation = Conversation.query.filter_by(id=chat_id, user_id=current_user.id).first()
+    
+    if not conversation:
+        flash('Silinecek sohbet bulunamadı veya yetkiniz yok.', 'danger')
+        return redirect(url_for('home'))
 
+    db.session.delete(conversation)
+    db.session.commit()
+    flash('Sohbet başarıyla silindi.', 'success')
+    
+    # Silindikten sonra kullanıcıyı en son sohbete veya yeni bir sohbete yönlendir
+    return redirect(url_for('home'))
+
+
+# Ana sayfa: Ya mevcut bir sohbeti yükler ya da yeni bir tane başlatır
 @app.route("/", defaults={'chat_id': None})
 @app.route("/chat/<int:chat_id>")
 @login_required 
@@ -165,7 +162,6 @@ def home(chat_id):
         # Belirtilen konuşmayı yükle
         current_conversation = Conversation.query.filter_by(id=chat_id, user_id=current_user.id).first()
         if not current_conversation:
-             # Eğer ID ile gelen sohbet bulunamazsa, ilk sohbete yönlendir
             flash('İstenen sohbet bulunamadı.', 'danger')
             return redirect(url_for('home'))
 
@@ -177,7 +173,7 @@ def home(chat_id):
         chat_history = load_chat_history_from_db(current_conversation.id)
     
     else:
-        # Hiç konuşma yoksa, otomatik olarak boş bir tane oluştur (Kullanıcının ilk girişi)
+        # Hiç konuşma yoksa, otomatik olarak boş bir tane oluştur 
         default_model = MODEL_MAPPING.get("4.0 pro", "gemini-2.5-flash")
         current_conversation = Conversation(
             user_id=current_user.id,
@@ -186,7 +182,6 @@ def home(chat_id):
         )
         db.session.add(current_conversation)
         db.session.commit()
-        # Yeni oluşturulan konuşmayı listeye ekle
         conversations.insert(0, current_conversation)
 
     # index.html'e gönderilecek veriler
@@ -196,7 +191,7 @@ def home(chat_id):
                            current_chat_id=current_conversation.id,
                            initial_history=chat_history) 
 
-@app.route("/chat_message", methods=["POST"])
+@app.route("/chat_message", methods=["POST"]) # Mesajlaşma rotası (Eski /chat rotasının yerini aldı)
 @login_required 
 def chat_message():
     try:
@@ -217,7 +212,6 @@ def chat_message():
         current_history = load_chat_history_from_db(conversation.id)
         
         # 2. Kullanıcı mesajını veritabanına kaydet
-        # Henüz commit etmiyoruz, AI yanıtını da ekledikten sonra tek commit yapacağız
         user_record = Message(
             conversation_id=conversation.id, 
             role='user', 
@@ -240,12 +234,10 @@ def chat_message():
                         yield chunk.text
                         full_response_text += chunk.text
             except Exception as e:
-                # API çağrısı sırasında bir hata oluşursa
                 print(f"Stream sırasında hata: {e}")
-                # Hata mesajını istemciye gönder, ayrıca veritabanına da boş yanıt kaydetme
                 yield f"\n\n$$$STREAM_ERROR$$$Üzgünüm, API'dan yanıt alınırken bir hata oluştu: {e}"
             finally:
-                # 4. Stream bittiğinde, yapay zeka yanıtını veritabanına kaydet (Hata yoksa)
+                # 4. Stream bittiğinde, yapay zeka yanıtını veritabanına kaydet
                 if full_response_text:
                     ai_record = Message(
                         conversation_id=conversation.id,
@@ -322,4 +314,6 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == "__main__":
+    # Eğer PostgreSQL kullanıyorsanız, yerelde test ederken de DATABASE_URL ayarlanmış olmalı.
+    # Aksi takdirde, SQLite dosyası (users.db) oluşacaktır.
     app.run(debug=True)
