@@ -10,4 +10,5 @@ MarkupSafe
 werkzeug
 Flask-SQLAlchemy
 Flask-Login
-psycopg2-binary # <<< PostgreSQL bağlantı kütüphanesi
+psycopg2-binary
+pillow
