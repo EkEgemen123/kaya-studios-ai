@@ -31,9 +31,10 @@
             line-height: 1;
             transition: color 0.2s, background-color 0.2s;
             flex-shrink: 0;
+            opacity: 0; /* Normalde gizli */
         }
         .convo-link-container:hover .delete-chat-btn {
-            display: block;
+            opacity: 1; /* Hover'da görünür */
         }
         .delete-chat-btn:hover { color: #f00; background-color: #3b3d40; }
 
@@ -146,7 +147,7 @@
         const sender = p.getAttribute('data-sender');
 
         if (sender === 'model' || sender === 'user') { 
-             // Hem AI hem de kullanıcı mesajları için Markdown kullan
+              // Hem AI hem de kullanıcı mesajları için Markdown kullan
             p.innerHTML = marked.parse(rawText);
         }
     });
@@ -226,6 +227,7 @@
                     const activeConvoLink = document.querySelector(`.conversation-item.active`);
                     if (activeConvoLink) {
                         activeConvoLink.textContent = newTitle;
+                        // Sayfanın yenilenmesi gerekebilir, ancak şimdilik sadece metni güncelleyelim.
                     }
                     
                     // Sinyalden önce gelen chunk kısmı varsa onu da yanıta ekle
@@ -264,11 +266,6 @@
             sendButton.disabled = false;
             messageInput.disabled = false;
             chatHistory.scrollTop = chatHistory.scrollHeight;
-            
-            // Başlık güncellendiyse (yani ilk mesaj gönderildiyse), sidebar'ı yenile
-            // Not: Bu tam bir yenileme değildir, sadece listenin en üstte olması için
-            // eğer başlık değiştiyse, sayfanın yeniden yüklenmesi gerekir.
-            // Fakat şimdilik sadece title güncelleme logic'i yeterli.
         }
     }
 
