@@ -33,7 +33,7 @@ login_manager.login_message = "Lütfen devam etmek için giriş yapın."
 
 # --- Gemini API Konfigürasyonu ---
 # YENİ OLUŞTURDUĞUNUZ GÜVENLİ API ANAHTARINIZI BURAYA YAPIŞTIRIN
-genai.configure(api_key="AIzaSyBdCo-TBO5gcORLfDPqWgLcoR73eav1JfQ")
+genai.configure(api_key="AIzaSyBGsFJ4FFOBgTWVWoP-7RBLTlIzjpuY-RE")
 
 # Gemini Client'ı oluştur (Resim oluşturma için)
 client = genai.Client()
