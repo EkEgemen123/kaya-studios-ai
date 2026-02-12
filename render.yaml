@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: kaya-studios-ai
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --threads 2 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: GEMINI_API_KEY
+        sync: false  # Manuel olarak ayarla
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kaya-db
+          property: connectionString
+      - key: FIREBASE_CONFIG
+        sync: false  # JSON formatında service account key
+      - key: SECRET_KEY
+        generateValue: true
+      - key: RENDER
+        value: "true"
+
+databases:
+  - name: kaya-db
+    databaseName: kayastudios
+    user: kayastudios
